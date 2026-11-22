@@ -1,0 +1,33 @@
+search_movies:
+  name: Search movies
+  description: Search the selected Plex movie library by a title or title fragment.
+  fields:
+    title:
+      name: Title
+      description: Full or partial movie title.
+      required: true
+      selector:
+        text:
+    server:
+      name: Server
+      description: Optional Plex server name. Use this when multiple PlexEx entries are configured.
+      required: false
+      selector:
+        text:
+
+mark_unwatched:
+  name: Mark unwatched
+  description: Mark a Plex library item as unwatched using its rating key.
+  fields:
+    rating_key:
+      name: Rating key
+      description: The ratingKey returned by plexex.search_movies.
+      required: true
+      selector:
+        text:
+    server:
+      name: Server
+      description: Optional Plex server name. Use this when multiple PlexEx entries are configured.
+      required: false
+      selector:
+        text:

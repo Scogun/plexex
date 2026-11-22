@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Plex server",
+        "description": "PlexEx reuses the connection configured in the official Plex integration.",
+        "data": {
+          "plex_entry_id": "Plex server"
+        }
+      }
+    },
+    "abort": {
+      "no_plex_servers": "No configured official Plex servers were found.",
+      "already_configured": "This Plex server is already configured in PlexEx."
+    }
+  }
+}

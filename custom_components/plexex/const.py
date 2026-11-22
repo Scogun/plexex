@@ -1,0 +1,6 @@
+"""PlexEx constants."""
+DOMAIN = "plexex"
+CONF_PLEX_ENTRY_ID = "plex_entry_id"
+CONF_SERVER = "server"
+SERVICE_SEARCH_MOVIES = "search_movies"
+SERVICE_MARK_UNWATCHED = "mark_unwatched"

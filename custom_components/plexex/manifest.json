@@ -1,0 +1,15 @@
+{
+  "domain": "plexex",
+  "name": "PlexEx",
+  "after_dependencies": [
+    "plex"
+  ],
+  "codeowners": [
+    "@Scogun"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/Scogun/PlexEx",
+  "integration_type": "service",
+  "issue_tracker": "https://github.com/Scogun/PlexEx/issues",
+  "version": "0.1.0"
+}

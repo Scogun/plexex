@@ -1,32 +1,67 @@
-name: Validate
+name: Validation
 
 on:
-  push:
   pull_request:
+  workflow_call:
+    outputs:
+      version:
+        description: Validated integration version to use as a Git tag
+        value: ${{ jobs.validate.outputs.version }}
+
+permissions:
+  contents: read
 
 jobs:
-  hassfest:
+  validate:
+    name: Validate PlexEx
     runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Run hassfest
         uses: home-assistant/actions/hassfest@master
 
-  hacs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
       - name: Validate Marketplace requirements
         uses: hacs/action@main
         with:
           category: integration
 
-  python:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.14.7"
+
       - name: Compile integration
         run: python -m compileall -q custom_components/plexex
+
+      - name: Read and validate version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(jq -r '.version' custom_components/plexex/manifest.json)"
+
+          if [[ ! "$VERSION" =~ ^([0-9]+\.){2}[0-9]+$ ]]; then
+            echo "::error::Invalid integration version in manifest.json: $VERSION"
+            exit 1
+          fi
+
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Integration version: $VERSION"
+
+      - name: Check whether tag already exists
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "::error::Git tag $VERSION already exists. Bump the version in manifest.json."
+            exit 1
+          fi
+
+          echo "Git tag $VERSION is available."

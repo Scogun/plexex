@@ -10,7 +10,7 @@ def search_movies(url: str, token: str, title: str) -> dict[str, Any]:
     for movie in found_movies:
         last_viewed_at = movie.lastViewedAt
         movies.append({
-            "ratingKey": str(movie.ratingKey),
+            "ratingKey": int(movie.ratingKey),
             "title": movie.title,
             "year": movie.year,
             "viewCount": movie.viewCount or 0,
@@ -20,7 +20,7 @@ def search_movies(url: str, token: str, title: str) -> dict[str, Any]:
         })
     return {"movies": movies}
 
-def mark_unwatched(url: str, token: str, rating_key: str) -> None:
+def mark_unwatched(url: str, token: str, rating_key: int) -> None:
     """Mark a Plex library item as unwatched."""
     plex = PlexServer(url, token)
     plex.fetchItem(rating_key).markUnwatched()

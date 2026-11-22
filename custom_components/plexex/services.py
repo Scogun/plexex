@@ -81,7 +81,7 @@ def async_register_services(hass: HomeAssistant) -> None:
             ) from err
 
     async def handle_mark_unwatched(call: ServiceCall) -> None:
-        rating_key = call.data["rating_key"].strip()
+        rating_key = call.data["rating_key"]
         if not rating_key:
             raise ServiceValidationError("The rating_key cannot be empty.")
         url, token = _resolve_plex_connection(hass, call.data.get(CONF_SERVER))

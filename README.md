@@ -22,7 +22,9 @@ Add one PlexEx config entry for each Plex server you want to use.
 
 ### `plexex.search_movies`
 
-The action returns response data and can be used with `response_variable`.
+Searches the Plex movie library by full or partial title.
+
+The action returns structured response data and can be used with `response_variable`.
 
 ```yaml
 sequence:
@@ -40,28 +42,67 @@ sequence:
             message: "{{ repeat.item.title }} ({{ repeat.item.year }})"
 ```
 
-Response shape:
+Response structure:
 
 ```yaml
 movies:
-  - ratingKey: "12345"
+  - ratingKey: 12345
     title: Harry Potter and the Philosopher's Stone
     year: 2001
     viewCount: 1
     lastViewedAt: "2025-12-25T20:15:00"
 ```
 
+Fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `ratingKey` | Integer | Plex library item identifier |
+| `title` | String | Movie title |
+| `year` | Integer | Release year |
+| `viewCount` | Integer | Number of times watched |
+| `lastViewedAt` | String or null | Last viewed timestamp |
+
 `lastViewedAt` is `null` if Plex has no last-viewed timestamp.
 
+The `movies` field is already a structured list. No JSON parsing is required.
+
 ### `plexex.mark_unwatched`
+
+Marks a Plex library item as unwatched.
 
 ```yaml
 action: plexex.mark_unwatched
 data:
-  rating_key: "12345"
+  rating_key: 12345
 ```
 
-Use the `ratingKey` returned by `plexex.search_movies`.
+Use the integer `ratingKey` returned by `plexex.search_movies`.
+
+### Example: Search and mark all matching movies as unwatched
+
+```yaml
+alias: Mark matching Plex movies as unwatched
+fields:
+  title:
+    name: Movie title
+    required: true
+    selector:
+      text:
+
+sequence:
+  - action: plexex.search_movies
+    data:
+      title: "{{ title }}"
+    response_variable: result
+
+  - repeat:
+      for_each: "{{ result.movies }}"
+      sequence:
+        - action: plexex.mark_unwatched
+          data:
+            rating_key: "{{ repeat.item.ratingKey }}"
+```
 
 ## Multiple Plex servers
 
@@ -76,6 +117,8 @@ response_variable: result
 ```
 
 The name must match the server name shown by the official Plex integration.
+
+The optional `server` field is also supported by `plexex.mark_unwatched`.
 
 ## Technical notes
 

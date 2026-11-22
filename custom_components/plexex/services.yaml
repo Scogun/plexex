@@ -24,7 +24,10 @@ mark_unwatched:
       description: The ratingKey returned by plexex.search_movies.
       required: true
       selector:
-        text:
+        number:
+          min: 1
+          mode: box
+          step: 1
     server:
       name: Server
       description: Optional Plex server name. Use this when multiple PlexEx entries are configured.

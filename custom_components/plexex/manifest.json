@@ -4,6 +4,9 @@
   "after_dependencies": [
     "plex"
   ],
+  "categories": [
+    "media_entertainment.tv_streaming"
+  ],
   "codeowners": [
     "@Scogun"
   ],

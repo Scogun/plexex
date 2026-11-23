@@ -16,7 +16,7 @@ class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_plex_servers")
 
         configured_plex_entry_ids = {
-            entry.data.get(CONF_PLEX_ENTRY_ID)
+            entry.unique_id
             for entry in self.hass.config_entries.async_entries(DOMAIN)
         }
         plex_entries = [

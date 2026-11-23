@@ -55,7 +55,7 @@ def resolve_plex_connection(
     token = server_config.get("token")
     if not url:
         raise HomeAssistantError(
-            "The selected official Plex entry has no URL/token in data.server_config."
+            "The selected official Plex entry has no URL in data.server_config."
         )
 
-    return str(url), str(token)
+    return str(url), str(token) if token is not None else None

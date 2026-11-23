@@ -6,10 +6,10 @@ from plexapi.server import PlexServer
 from .models import PlexCapabilities
 
 def get_account_capabilities(token: str | None) -> PlexCapabilities | None:
+    """Retrieve Plex account subscription capabilities."""
     if token is None:
         return None
 
-    """Retrieve Plex account subscription capabilities."""
     account = MyPlexAccount(token=token)
 
     features = getattr(account, "subscriptionFeatures", None) or []

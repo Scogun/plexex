@@ -1,9 +1,10 @@
 # PlexEx
 
-PlexEx adds two automation actions to Home Assistant for an existing Plex Media Server connection:
+PlexEx extends an existing Plex Media Server connection with automation actions and a Plex Pass status sensor:
 
 - `plexex.search_movies` — search the movie library by title or title fragment.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
+- A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
 
 PlexEx reuses the URL and token stored by the official Home Assistant Plex integration. It does not ask for Plex credentials again.
 
@@ -14,12 +15,12 @@ PlexEx reuses the URL and token stored by the official Home Assistant Plex integ
 
 ## Installation
 
-### Install from the Home Assistant Marketplace catalog
+<!-- ### Install from the Home Assistant Marketplace catalog
 
 1. Open **Settings → Marketplace**.
 2. Search for **PlexEx**.
 3. Open the PlexEx repository page and select **Install**.
-4. Complete the integration setup by selecting the existing official Plex server.
+4. Complete the integration setup by selecting the existing official Plex server. -->
 
 ### Install as a custom repository
 
@@ -127,23 +128,27 @@ sequence:
 
 ## Multiple Plex servers
 
-If multiple PlexEx entries are configured, pass the server name:
+If multiple PlexEx entries are configured, select the connection in the action's **Server** field. In YAML, `server` is the PlexEx config entry ID selected by the action selector:
 
 ```yaml
 action: plexex.search_movies
 data:
   title: Interstellar
-  server: Living Room Plex
+  server: YOUR_PLEXEX_CONFIG_ENTRY_ID
 response_variable: result
 ```
 
-The name must match the server name shown by the official Plex integration. The optional `server` field is also supported by `plexex.mark_unwatched`.
+The same optional `server` field is available for `plexex.mark_unwatched`. Leave it empty if only one PlexEx connection is configured.
+
+## Plex Pass sensor
+
+Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**. It is on when the Plex account subscription is active. Its attributes include the Plex username, subscription plan, and subscription features. Account details are refreshed hourly.
 
 ## Technical notes
 
 - PlexAPI network calls run in Home Assistant's executor, not in the event loop.
 - PlexEx supports movies only.
-- PlexEx creates no entities or sensors.
+- PlexEx creates one diagnostic binary sensor for each configured Plex server.
 - PlexAPI is supplied by the official Plex integration dependency; PlexEx does not install a second version.
 
 ## Development and releases

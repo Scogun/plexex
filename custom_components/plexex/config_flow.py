@@ -10,9 +10,20 @@ class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Select the Plex server to extend."""
-        plex_entries = self.hass.config_entries.async_entries("plex")
-        if not plex_entries:
+        all_plex_entries = self.hass.config_entries.async_entries("plex")
+        if not all_plex_entries:
             return self.async_abort(reason="no_plex_servers")
+
+        configured_plex_entry_ids = {
+            entry.data.get(CONF_PLEX_ENTRY_ID)
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        }
+        plex_entries = [
+            entry for entry in all_plex_entries
+            if entry.entry_id not in configured_plex_entry_ids
+        ]
+        if not plex_entries:
+            return self.async_abort(reason="already_configured")
 
         options = [
             {"value": entry.entry_id, "label": entry.data.get("server") or entry.title}

@@ -1,6 +1,27 @@
 """Synchronous PlexAPI operations."""
 from typing import Any
+from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
+
+from .models import PlexCapabilities
+
+def get_account_capabilities(token: str) -> PlexCapabilities:
+    """Retrieve Plex account subscription capabilities."""
+    account = MyPlexAccount(token=token)
+
+    features = getattr(account, "subscriptionFeatures", None) or []
+
+    if isinstance(features, str):
+        features = [features]
+
+    return PlexCapabilities(
+        username=getattr(account, "username", None),
+        plex_pass_active=bool(
+            getattr(account, "subscriptionActive", False)
+        ),
+        subscription_plan=getattr(account, "subscriptionPlan", None),
+        subscription_features=tuple(str(item) for item in features),
+    )
 
 def search_movies(url: str, token: str, title: str) -> dict[str, Any]:
     """Search the Plex movie library."""

@@ -10,10 +10,11 @@ search_movies:
         text:
     server:
       name: Server
-      description: Optional Plex server name. Use this when multiple PlexEx entries are configured.
+      description: Select a PlexEx connection. Leave empty when only one is configured.
       required: false
       selector:
-        text:
+        config_entry:
+          integration: plexex
 
 mark_unwatched:
   name: Mark unwatched
@@ -30,7 +31,8 @@ mark_unwatched:
           step: 1
     server:
       name: Server
-      description: Optional Plex server name. Use this when multiple PlexEx entries are configured.
+      description: Select a PlexEx connection. Leave empty when only one is configured.
       required: false
       selector:
-        text:
+        config_entry:
+          integration: plexex

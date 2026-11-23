@@ -6,14 +6,13 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
 
 from .common import resolve_plex_connection
-from .const import CONF_PLEX_ENTRY_ID, DOMAIN
+from .const import DOMAIN
 from .models import PlexCapabilities
 from .plex_client import get_account_capabilities
 
@@ -31,7 +30,7 @@ class PlexCapabilitiesCoordinator(
             self,
             hass: HomeAssistant,
             entry: ConfigEntry,
-            token: str,
+            token: str | None,
     ) -> None:
         """Initialize the coordinator."""
         self.token = token
@@ -43,7 +42,7 @@ class PlexCapabilitiesCoordinator(
             update_interval=UPDATE_INTERVAL,
         )
 
-    async def _async_update_data(self) -> PlexCapabilities:
+    async def _async_update_data(self) -> PlexCapabilities | None:
         """Fetch account capabilities from Plex."""
         try:
             return await self.hass.async_add_executor_job(
@@ -54,22 +53,6 @@ class PlexCapabilitiesCoordinator(
             raise UpdateFailed(
                 f"Could not retrieve Plex account capabilities: {err}"
             ) from err
-
-
-def get_plex_entry(
-        hass: HomeAssistant,
-        entry: ConfigEntry,
-) -> ConfigEntry:
-    """Get the official Plex config entry."""
-    plex_entry_id = entry.data.get(CONF_PLEX_ENTRY_ID)
-    plex_entry = hass.config_entries.async_get_entry(plex_entry_id)
-
-    if plex_entry is None or plex_entry.domain != "plex":
-        raise ConfigEntryNotReady(
-            "The associated official Plex integration entry is unavailable."
-        )
-
-    return plex_entry
 
 
 def create_coordinator(

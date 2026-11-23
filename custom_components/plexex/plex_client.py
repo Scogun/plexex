@@ -5,7 +5,10 @@ from plexapi.server import PlexServer
 
 from .models import PlexCapabilities
 
-def get_account_capabilities(token: str) -> PlexCapabilities:
+def get_account_capabilities(token: str | None) -> PlexCapabilities | None:
+    if token is None:
+        return None
+
     """Retrieve Plex account subscription capabilities."""
     account = MyPlexAccount(token=token)
 
@@ -23,7 +26,7 @@ def get_account_capabilities(token: str) -> PlexCapabilities:
         subscription_features=tuple(str(item) for item in features),
     )
 
-def search_movies(url: str, token: str, title: str) -> dict[str, Any]:
+def search_movies(url: str, token: str | None, title: str) -> dict[str, Any]:
     """Search the Plex movie library."""
     plex = PlexServer(url, token)
     found_movies = plex.library.search(title=title, libtype="movie")
@@ -41,7 +44,7 @@ def search_movies(url: str, token: str, title: str) -> dict[str, Any]:
         })
     return {"movies": movies}
 
-def mark_unwatched(url: str, token: str, rating_key: int) -> None:
+def mark_unwatched(url: str, token: str | None, rating_key: int) -> None:
     """Mark a Plex library item as unwatched."""
     plex = PlexServer(url, token)
     plex.fetchItem(rating_key).markUnwatched()

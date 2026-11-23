@@ -2,7 +2,8 @@
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
-from .const import CONF_PLEX_ENTRY_ID, DOMAIN
+from homeassistant.helpers.selector import SelectOptionDict
+from .const import CONF_PLEX_ENTRY_ID, DOMAIN, PLEX_DOMAIN
 
 class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Configure PlexEx by selecting an existing official Plex entry."""
@@ -10,7 +11,7 @@ class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Select the Plex server to extend."""
-        all_plex_entries = self.hass.config_entries.async_entries("plex")
+        all_plex_entries = self.hass.config_entries.async_entries(PLEX_DOMAIN)
         if not all_plex_entries:
             return self.async_abort(reason="no_plex_servers")
 
@@ -26,14 +27,17 @@ class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="already_configured")
 
         options = [
-            {"value": entry.entry_id, "label": entry.data.get("server") or entry.title}
+            SelectOptionDict(
+                value=entry.entry_id,
+                label=str(entry.data.get("server") or entry.title),
+            )
             for entry in plex_entries
         ]
 
         if user_input is not None:
             plex_entry_id = user_input[CONF_PLEX_ENTRY_ID]
             plex_entry = self.hass.config_entries.async_get_entry(plex_entry_id)
-            if plex_entry is None or plex_entry.domain != "plex":
+            if plex_entry is None or plex_entry.domain != PLEX_DOMAIN:
                 return self.async_abort(reason="no_plex_servers")
 
             await self.async_set_unique_id(plex_entry_id)
@@ -41,7 +45,7 @@ class PlexExConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             server_name = plex_entry.data.get("server") or plex_entry.title
             return self.async_create_entry(
                 title=f"PlexEx ({server_name})",
-                data={CONF_PLEX_ENTRY_ID: plex_entry_id},
+                data={},
             )
 
         schema = vol.Schema({

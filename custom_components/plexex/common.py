@@ -4,12 +4,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import DOMAIN, PLEX_DOMAIN
+from .models import PlexConnection
 
 
 def resolve_plex_connection(
         hass: HomeAssistant, plexex_entry_id: str | None
-) -> tuple[str, str | None]:
-    """Resolve a PlexEx config entry ID to its official Plex URL and token.
+) -> PlexConnection:
+    """Resolve a PlexEx config entry ID to its official Plex connection.
 
     If no ID is supplied, use the only configured PlexEx entry. An explicit ID
     is required when multiple PlexEx entries are configured.
@@ -58,4 +59,9 @@ def resolve_plex_connection(
             "The selected official Plex entry has no URL in data.server_config."
         )
 
-    return str(url), str(token) if token is not None else None
+    return PlexConnection(
+        url=str(url),
+        token=str(token) if token is not None else None,
+        # The official integration treats a missing value as "verify".
+        verify_ssl=bool(server_config.get("verify_ssl", True)),
+    )

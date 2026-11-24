@@ -1,4 +1,15 @@
+"""PlexEx data models."""
 from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PlexConnection:
+    """Connection settings taken from the official Plex config entry."""
+
+    url: str
+    token: str | None
+    verify_ssl: bool = True
+
 
 @dataclass(frozen=True)
 class PlexCapabilities:

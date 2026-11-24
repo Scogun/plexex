@@ -2,8 +2,23 @@
 from typing import Any
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
+from requests import Session
 
-from .models import PlexCapabilities
+from .models import PlexCapabilities, PlexConnection
+
+
+def _connect(connection: PlexConnection) -> PlexServer:
+    """Connect to the Plex server the same way the official integration does.
+
+    Certificate verification is only disabled when the official Plex entry
+    was configured with ``verify_ssl`` turned off.
+    """
+    session = None
+    if connection.url.startswith("https") and not connection.verify_ssl:
+        session = Session()
+        session.verify = False
+    return PlexServer(connection.url, connection.token, session)
+
 
 def get_account_capabilities(token: str | None) -> PlexCapabilities | None:
     """Retrieve Plex account subscription capabilities."""
@@ -26,9 +41,9 @@ def get_account_capabilities(token: str | None) -> PlexCapabilities | None:
         subscription_features=tuple(str(item) for item in features),
     )
 
-def search_movies(url: str, token: str | None, title: str) -> dict[str, Any]:
+def search_movies(connection: PlexConnection, title: str) -> dict[str, Any]:
     """Search the Plex movie library."""
-    plex = PlexServer(url, token)
+    plex = _connect(connection)
     found_movies = plex.library.search(title=title, libtype="movie")
     movies = []
     for movie in found_movies:
@@ -44,7 +59,7 @@ def search_movies(url: str, token: str | None, title: str) -> dict[str, Any]:
         })
     return {"movies": movies}
 
-def mark_unwatched(url: str, token: str | None, rating_key: int) -> None:
+def mark_unwatched(connection: PlexConnection, rating_key: int) -> None:
     """Mark a Plex library item as unwatched."""
-    plex = PlexServer(url, token)
+    plex = _connect(connection)
     plex.fetchItem(rating_key).markUnwatched()

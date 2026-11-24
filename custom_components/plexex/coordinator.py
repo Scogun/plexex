@@ -60,6 +60,6 @@ def create_coordinator(
         entry: ConfigEntry,
 ) -> PlexCapabilitiesCoordinator:
     """Create a coordinator using the official Plex connection."""
-    _, token = resolve_plex_connection(hass, entry.entry_id)
+    connection = resolve_plex_connection(hass, entry.entry_id)
 
-    return PlexCapabilitiesCoordinator(hass, entry, token)
+    return PlexCapabilitiesCoordinator(hass, entry, connection.token)

@@ -147,7 +147,7 @@ Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**.
 
 ## Final credits trigger
 
-PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. On each media-player update, PlexEx compares the new `media_position` with the previous one. When the reported position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entity. In the automation editor, choose the **Event received** trigger, target the PlexEx device, and select `final_credits_started`:
+PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. Between position updates, it estimates playback locally from `media_position` and `media_position_updated_at` and checks the estimate once per second; it does not poll Plex sessions. When the estimated position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entity. In the automation editor, choose the **Event received** trigger, target the PlexEx device, and select `final_credits_started`:
 
 ```yaml
 triggers:

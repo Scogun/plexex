@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.helpers import entity_registry
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .common import resolve_plex_connection
 from .const import EVENT_FINAL_CREDITS_STARTED, PLEX_DOMAIN
@@ -15,6 +18,7 @@ from .plex_client import get_final_credits_marker
 
 _LOGGER = logging.getLogger(__name__)
 MARKER_CACHE_SIZE = 256
+POSITION_CHECK_INTERVAL = timedelta(seconds=1)
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,7 @@ class PlaybackAnchor:
     rating_key: int
     state: str
     position: float
+    updated_at: datetime
     title: str
     user: str | None
     player: str | None
@@ -41,8 +46,10 @@ class PlexPlaybackMonitor:
         )
         self._plex_entry_id = plex_entry.entry_id if plex_entry else None
         self._anchors: dict[str, PlaybackAnchor] = {}
+        self._last_positions: dict[str, float] = {}
         self._marker_cache: OrderedDict[int, dict | None] = OrderedDict()
         self._unsub_state_changed = None
+        self._unsub_position_check = None
 
     def start(self) -> None:
         """Listen for state updates pushed by Plex media players."""
@@ -55,6 +62,11 @@ class PlexPlaybackMonitor:
         self._unsub_state_changed = self.hass.bus.async_listen(
             "state_changed", self._async_state_changed
         )
+        self._unsub_position_check = async_track_time_interval(
+            self.hass,
+            self._async_check_positions,
+            POSITION_CHECK_INTERVAL,
+        )
         self.hass.async_create_task(self._async_seed_active_players())
 
     def stop(self) -> None:
@@ -62,6 +74,9 @@ class PlexPlaybackMonitor:
         if self._unsub_state_changed is not None:
             self._unsub_state_changed()
             self._unsub_state_changed = None
+        if self._unsub_position_check is not None:
+            self._unsub_position_check()
+            self._unsub_position_check = None
 
     async def _async_seed_active_players(self) -> None:
         """Establish a baseline for Plex players already active at startup."""
@@ -96,6 +111,7 @@ class PlexPlaybackMonitor:
         new_state = event.data.get("new_state")
         if new_state is None:
             self._anchors.pop(entity_id, None)
+            self._last_positions.pop(entity_id, None)
             return
 
         await self._async_update_player(entity_id, new_state)
@@ -106,6 +122,7 @@ class PlexPlaybackMonitor:
         """Update a playback anchor from one Plex media-player state."""
         if state.state not in {"playing", "paused"}:
             self._anchors.pop(entity_id, None)
+            self._last_positions.pop(entity_id, None)
             return
 
         attributes = state.attributes
@@ -114,10 +131,16 @@ class PlexPlaybackMonitor:
         if rating_key is None or not isinstance(position, (int, float)):
             return
 
+        updated_at_value = attributes.get("media_position_updated_at")
+        if isinstance(updated_at_value, datetime):
+            updated_at = updated_at_value
+        else:
+            updated_at = dt_util.parse_datetime(updated_at_value) or dt_util.utcnow()
         anchor = PlaybackAnchor(
             rating_key=rating_key,
             state=state.state,
             position=float(position),
+            updated_at=dt_util.as_utc(updated_at),
             title=str(attributes.get("media_title") or "Unknown Plex media"),
             user=_optional_str(attributes.get("username")),
             player=_optional_str(
@@ -128,13 +151,23 @@ class PlexPlaybackMonitor:
         previous_anchor = self._anchors.get(entity_id)
         self._anchors[entity_id] = anchor
         marker = await self._async_get_marker(rating_key)
+        now = dt_util.utcnow()
+        current_position = _estimated_position(anchor, now)
 
         if (
             not baseline
             and previous_anchor is not None
             and previous_anchor.rating_key == rating_key
         ):
-            self._maybe_fire(previous_anchor, anchor, marker)
+            previous_position = self._last_positions.get(entity_id)
+            if previous_position is None:
+                previous_position = _estimated_position(previous_anchor, now)
+            self._maybe_fire(
+                replace(previous_anchor, position=previous_position),
+                replace(anchor, position=current_position),
+                marker,
+            )
+        self._last_positions[entity_id] = current_position
 
     async def _async_get_marker(self, rating_key: int) -> dict | None:
         """Fetch and cache a movie's final marker once per rating key."""
@@ -162,6 +195,21 @@ class PlexPlaybackMonitor:
         if len(self._marker_cache) > MARKER_CACHE_SIZE:
             self._marker_cache.popitem(last=False)
         return marker
+
+    async def _async_check_positions(self, _now: datetime) -> None:
+        """Check playback locally between state updates from Plex."""
+        now = dt_util.utcnow()
+        for entity_id, anchor in tuple(self._anchors.items()):
+            current_position = _estimated_position(anchor, now)
+            previous_position = self._last_positions.get(entity_id)
+            if previous_position is not None:
+                marker = self._marker_cache.get(anchor.rating_key)
+                self._maybe_fire(
+                    replace(anchor, position=previous_position),
+                    replace(anchor, position=current_position),
+                    marker,
+                )
+            self._last_positions[entity_id] = current_position
 
     def _maybe_fire(
         self,
@@ -196,6 +244,14 @@ class PlexPlaybackMonitor:
                 "player": anchor.player,
             },
         )
+
+
+def _estimated_position(anchor: PlaybackAnchor, now: datetime) -> float:
+    """Estimate playback position from the latest Plex position update."""
+    if anchor.state != "playing":
+        return anchor.position
+    elapsed = max(0.0, (now - anchor.updated_at).total_seconds())
+    return anchor.position + elapsed
 
 
 def _optional_str(value: object) -> str | None:

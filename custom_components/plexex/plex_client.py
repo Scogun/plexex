@@ -76,3 +76,31 @@ def mark_unwatched(connection: PlexConnection, rating_key: int) -> None:
     """Mark a Plex library item as unwatched."""
     plex = _connect(connection)
     plex.fetchItem(rating_key).markUnwatched()
+
+def get_final_credits_marker(
+    connection: PlexConnection, rating_key: int
+) -> dict[str, Any] | None:
+    """Fetch a movie's final credits marker and cacheable metadata."""
+    plex = _connect(connection)
+    item = plex.fetchItem(rating_key)
+    item.reload(includeMarkers=True)
+
+    if item.type != "movie" and item.type != "episode":
+        return None
+
+    final_marker = next(
+        (
+            marker for marker in item.markers
+            if marker.type == "credits" and marker.final
+        ),
+        None,
+    )
+    if final_marker is None:
+        return None
+
+    return {
+        "rating_key": int(item.ratingKey),
+        "title": item.title,
+        "marker_start": int(final_marker.start),
+        "marker_end": int(final_marker.end),
+    }

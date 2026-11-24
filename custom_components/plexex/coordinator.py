@@ -33,6 +33,7 @@ class PlexCapabilitiesCoordinator(
             token: str | None,
     ) -> None:
         """Initialize the coordinator."""
+        self._entry_id = entry.entry_id
         self.token = token
 
         super().__init__(
@@ -45,6 +46,10 @@ class PlexCapabilitiesCoordinator(
     async def _async_update_data(self) -> PlexCapabilities | None:
         """Fetch account capabilities from Plex."""
         try:
+            self.token = resolve_plex_connection(
+                self.hass, self._entry_id
+            ).token
+
             return await self.hass.async_add_executor_job(
                 get_account_capabilities,
                 self.token,

@@ -1,10 +1,14 @@
 """Synchronous PlexAPI operations."""
+import logging
 from typing import Any
+from plexapi.exceptions import PlexApiException
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
-from requests import Session
+from requests import RequestException, Session
 
 from .models import PlexCapabilities, PlexConnection
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _connect(connection: PlexConnection) -> PlexServer:
@@ -20,24 +24,33 @@ def _connect(connection: PlexConnection) -> PlexServer:
     return PlexServer(connection.url, connection.token, session)
 
 
-def get_account_capabilities(token: str | None) -> PlexCapabilities | None:
-    """Retrieve Plex account subscription capabilities."""
-    if token is None:
-        return None
+def get_capabilities(connection: PlexConnection) -> PlexCapabilities:
+    """Retrieve Plex Pass status from the server and details from plex.tv."""
+    plex = _connect(connection)
 
-    account = MyPlexAccount(token=token)
+    username = None
+    subscription_plan = None
+    features = []
 
-    features = getattr(account, "subscriptionFeatures", None) or []
+    if connection.token is not None:
+        try:
+            account = MyPlexAccount(token=connection.token)
+            username = getattr(account, "username", None)
+            subscription_plan = getattr(account, "subscriptionPlan", None)
+            features = getattr(account, "subscriptionFeatures", None) or []
+        except (PlexApiException, RequestException) as err:
+            _LOGGER.debug(
+                "Plex account details are not available (%s)",
+                type(err).__name__,
+            )
 
     if isinstance(features, str):
         features = [features]
 
     return PlexCapabilities(
-        username=getattr(account, "username", None),
-        plex_pass_active=bool(
-            getattr(account, "subscriptionActive", False)
-        ),
-        subscription_plan=getattr(account, "subscriptionPlan", None),
+        username=username,
+        plex_pass_active=getattr(plex, "myPlexSubscription", None),
+        subscription_plan=subscription_plan,
         subscription_features=tuple(str(item) for item in features),
     )
 

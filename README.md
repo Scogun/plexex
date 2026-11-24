@@ -142,7 +142,7 @@ The same optional `server` field is available for `plexex.mark_unwatched`. Leave
 
 ## Plex Pass sensor
 
-Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**. It is on when the Plex account subscription is active. Its attributes include the Plex username, subscription plan, and subscription features. Account details are refreshed hourly.
+Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**. It is on when the Plex server reports an active Plex Pass; this is read from the server itself. Its attributes include the Plex username, subscription plan, and subscription features. These come from plex.tv using the server's token and are empty when the token cannot be used there, for example on a local server without a token. Everything is refreshed hourly.
 
 ## Technical notes
 

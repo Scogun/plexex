@@ -29,9 +29,9 @@ def async_register_services(hass: HomeAssistant) -> None:
         title = call.data["title"].strip()
         if not title:
             raise ServiceValidationError("The movie title cannot be empty.")
-        url, token = resolve_plex_connection(hass, call.data.get(CONF_SERVER))
+        connection = resolve_plex_connection(hass, call.data.get(CONF_SERVER))
         try:
-            return await hass.async_add_executor_job(search_movies, url, token, title)
+            return await hass.async_add_executor_job(search_movies, connection, title)
         except Exception as err:
             _LOGGER.error("PlexEx movie search failed (%s)", type(err).__name__)
             raise HomeAssistantError(
@@ -42,9 +42,9 @@ def async_register_services(hass: HomeAssistant) -> None:
         rating_key = call.data["rating_key"]
         if not rating_key:
             raise ServiceValidationError("The rating_key cannot be empty.")
-        url, token = resolve_plex_connection(hass, call.data.get(CONF_SERVER))
+        connection = resolve_plex_connection(hass, call.data.get(CONF_SERVER))
         try:
-            await hass.async_add_executor_job(mark_unwatched, url, token, rating_key)
+            await hass.async_add_executor_job(mark_unwatched, connection, rating_key)
         except Exception as err:
             _LOGGER.error("PlexEx mark_unwatched failed (%s)", type(err).__name__)
             raise HomeAssistantError(

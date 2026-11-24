@@ -2,7 +2,7 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
-from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN
@@ -27,7 +27,9 @@ async def async_setup_entry(
     try:
         coordinator_instance = create_coordinator(hass, entry)
     except HomeAssistantError as err:
-        raise ConfigEntryError(str(err)) from err
+        # The linked Plex server may be added back to the official Plex
+        # integration later, so keep retrying instead of failing for good.
+        raise ConfigEntryNotReady(str(err)) from err
 
     # Do not fail integration setup if Plex account lookup is temporarily
     # unavailable. The sensor will be created as unavailable and retried.

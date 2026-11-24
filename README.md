@@ -5,6 +5,7 @@ PlexEx extends an existing Plex Media Server connection with automation actions 
 - `plexex.search_movies` — search the movie library by title or title fragment.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
+- A **Playback event** event entity with the **final_credits_started** event type when playback enters a movie's final credits marker. The integration also fires the `plexex_final_credits_started` Home Assistant event.
 
 PlexEx reuses the URL and token stored by the official Home Assistant Plex integration. It does not ask for Plex credentials again.
 
@@ -143,6 +144,22 @@ The same optional `server` field is available for `plexex.mark_unwatched`. Leave
 ## Plex Pass sensor
 
 Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**. It is on when the Plex server reports an active Plex Pass; this is read from the server itself. Its attributes include the Plex username, subscription plan, and subscription features. These come from plex.tv using the server's token and are empty when the token cannot be used there, for example on a local server without a token. Everything is refreshed hourly.
+
+## Final credits trigger
+
+PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. On each media-player update, PlexEx compares the new `media_position` with the previous one. When the reported position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entity. In the automation editor, choose the **Event received** trigger, target the PlexEx device, and select `final_credits_started`:
+
+```yaml
+triggers:
+  - trigger: event.received
+    target:
+      device_id: YOUR_PLEXEX_DEVICE_ID
+    options:
+      event_type:
+        - final_credits_started
+```
+
+The event data includes `server` (PlexEx config entry ID), `rating_key`, `title`, `view_offset`, `marker_start`, `marker_end`, `user`, and `player`. Time offsets are milliseconds. The event is emitted only when Plex provides a final credits marker (`final="1"`); it is not inferred from every `credits` marker. If playback is already inside the marker when PlexEx starts, PlexEx establishes a baseline and does not fire an event for that playback.
 
 ## Technical notes
 

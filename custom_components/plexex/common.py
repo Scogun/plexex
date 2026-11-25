@@ -6,7 +6,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from .const import DOMAIN, PLEX_DOMAIN
 from .models import PlexConnection
 
-def _get_plex_entry(
+def get_plex_entry(
         hass: HomeAssistant, plexex_entry: ConfigEntry
 ) -> ConfigEntry | None:
     """Return the official Plex entry a PlexEx entry is linked to, if any."""
@@ -40,7 +40,7 @@ def resolve_plex_connection(
         # Without an explicit ID, ignore entries whose Plex entry is gone.
         connections = [
             entry for entry in plexex_entries
-            if _get_plex_entry(hass, entry) is not None
+            if get_plex_entry(hass, entry) is not None
         ]
         if len(connections) > 1:
             raise ServiceValidationError(
@@ -53,7 +53,7 @@ def resolve_plex_connection(
             "an existing official Plex integration entry."
         )
 
-    plex_entry = _get_plex_entry(hass, connections[0])
+    plex_entry = get_plex_entry(hass, connections[0])
     if plex_entry is None:
         raise ServiceValidationError(
             "The Plex server linked to this PlexEx connection is not configured "

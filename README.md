@@ -5,7 +5,7 @@ PlexEx extends an existing Plex Media Server connection with automation actions 
 - `plexex.search_movies` — search the movie library by title or title fragment.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
-- A **Playback event** event entity with the **final_credits_started** event type when playback enters a movie's final credits marker. The integration also fires the `plexex_final_credits_started` Home Assistant event.
+- A **Playback event** event entity with the **final_credits_started** event type when playback enters a movie's final credits marker: one for the whole server and one for each Plex player. The integration also fires the `plexex_final_credits_started` Home Assistant event.
 
 PlexEx reuses the URL and token stored by the official Home Assistant Plex integration. It does not ask for Plex credentials again.
 
@@ -147,7 +147,27 @@ Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**.
 
 ## Final credits trigger
 
-PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. Between position updates, it estimates playback locally from `media_position` and `media_position_updated_at` and checks the estimate once per second; it does not poll Plex sessions. When the estimated position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entity. In the automation editor, choose the **Event received** trigger, target the PlexEx device, and select `final_credits_started`:
+PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. Between position updates, it estimates playback locally from `media_position` and `media_position_updated_at` and checks the estimate once per second; it does not poll Plex sessions. When the estimated position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entities.
+
+### React to one player
+
+PlexEx adds a **Playback event** entity to the device of every media player created by the official Plex integration, for example `event.plex_plex_for_apple_tv_living_room_playback_event`. It only receives events from that player. In the automation editor, choose the **Event received** trigger, target the player's device (or its **Playback event** entity), and select `final_credits_started`:
+
+```yaml
+triggers:
+  - trigger: event.received
+    target:
+      device_id: YOUR_PLEX_PLAYER_DEVICE_ID
+    options:
+      event_type:
+        - final_credits_started
+```
+
+Entities follow the official Plex integration: a new player gets its entity when Plex creates its media player, and the entity is removed together with the media player. Plex Web and other transient players share a single **Plex Client Service** device, so their entities are added to the PlexEx server device instead and carry the player's name.
+
+### React to any player
+
+The **Playback event** entity on the PlexEx server device receives events from every player of that server. Target the PlexEx device to use it:
 
 ```yaml
 triggers:
@@ -159,7 +179,19 @@ triggers:
         - final_credits_started
 ```
 
-The event data includes `server` (PlexEx config entry ID), `rating_key`, `title`, `view_offset`, `marker_start`, `marker_end`, `user`, and `player`. Time offsets are milliseconds. The event is emitted only when Plex provides a final credits marker (`final="1"`); it is not inferred from every `credits` marker. If playback is already inside the marker when PlexEx starts, PlexEx establishes a baseline and does not fire an event for that playback.
+### Event data
+
+The event data includes `server` (PlexEx config entry ID), `rating_key`, `title`, `view_offset`, `marker_start`, `marker_end`, `user`, `player_name` (display name), and `player_id` (entity ID of the Plex media player). `player` is deprecated: it carries the same value as `player_name` and will be removed in 0.9.0. To filter the raw `plexex_final_credits_started` event by player, match on `player_id`:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: plexex_final_credits_started
+    event_data:
+      player_id: media_player.plex_plex_for_apple_tv_living_room
+```
+
+Time offsets are milliseconds. The event is emitted only when Plex provides a final credits marker (`final="1"`); it is not inferred from every `credits` marker. If playback is already inside the marker when PlexEx starts, PlexEx establishes a baseline and does not fire an event for that playback.
 
 ## Technical notes
 

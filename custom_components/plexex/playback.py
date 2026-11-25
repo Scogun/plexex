@@ -31,7 +31,7 @@ class Playback:
     position: float
     updated_at: datetime
     user: str | None
-    player: str | None
+    player_name: str | None
     checked_position: float = 0.0
 
     def position_at(self, now: datetime) -> float:
@@ -127,7 +127,7 @@ class PlexPlaybackMonitor:
             position=float(position),
             updated_at=updated_at,
             user=attributes.get("username"),
-            player=attributes.get("friendly_name") or attributes.get("app_name"),
+            player_name=attributes.get("friendly_name") or attributes.get("app_name"),
         )
 
         previous = self._playbacks.get(entity_id)
@@ -172,7 +172,7 @@ class PlexPlaybackMonitor:
     @callback
     def _async_check_positions(self, now: datetime) -> None:
         """Fire when playback crosses the final marker start."""
-        for playback in tuple(self._playbacks.values()):
+        for entity_id, playback in tuple(self._playbacks.items()):
             position = playback.position_at(now)
             marker = self._markers.get(playback.rating_key)
             if (
@@ -191,7 +191,10 @@ class PlexPlaybackMonitor:
                         "marker_start": marker["marker_start"],
                         "marker_end": marker["marker_end"],
                         "user": playback.user,
-                        "player": playback.player,
+                        # Deprecated: use "player_name". Remove in 0.9.0.
+                        "player": playback.player_name,
+                        "player_name": playback.player_name,
+                        "player_id": entity_id,
                     },
                 )
             playback.checked_position = position

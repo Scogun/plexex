@@ -39,14 +39,11 @@ async def async_setup_entry(
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator_instance
 
-    playback_monitor = PlexPlaybackMonitor(hass, entry)
-    hass.data[DOMAIN][entry.entry_id + "_playback"] = playback_monitor
-
     await hass.config_entries.async_forward_entry_setups(
         entry,
         PLATFORMS,
     )
-    playback_monitor.start()
+    PlexPlaybackMonitor(hass, entry).start()
 
     return True
 
@@ -63,10 +60,5 @@ async def async_unload_entry(
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        playback_monitor = hass.data[DOMAIN].pop(
-            entry.entry_id + "_playback", None
-        )
-        if playback_monitor is not None:
-            playback_monitor.stop()
 
     return unload_ok

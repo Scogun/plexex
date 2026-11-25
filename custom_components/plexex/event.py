@@ -9,9 +9,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .common import get_plex_entry
-from .const import DOMAIN, EVENT_FINAL_CREDITS_STARTED
+from .const import DOMAIN, EVENT_PREFIX, PLAYBACK_EVENT_TYPES
 
-EVENT_TYPE_FINAL_CREDITS_STARTED = "final_credits_started"
 EVENT_DOMAIN = "event"
 MEDIA_PLAYER_DOMAIN = "media_player"
 
@@ -119,7 +118,7 @@ class PlexPlaybackEvent(EventEntity):
     _attr_has_entity_name = True
     _attr_name = "Playback event"
     _attr_icon = "mdi:movie-play"
-    _attr_event_types = [EVENT_TYPE_FINAL_CREDITS_STARTED]
+    _attr_event_types = list(PLAYBACK_EVENT_TYPES)
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the event entity."""
@@ -128,27 +127,28 @@ class PlexPlaybackEvent(EventEntity):
         self._attr_device_info = _server_device_info(entry)
 
     async def async_added_to_hass(self) -> None:
-        """Listen for final credits events from this PlexEx server."""
+        """Listen for playback marker events from this PlexEx server."""
         await super().async_added_to_hass()
-        self.async_on_remove(
-            self.hass.bus.async_listen(
-                EVENT_FINAL_CREDITS_STARTED,
-                self._handle_final_credits_started,
+        for event_type in PLAYBACK_EVENT_TYPES:
+            self.async_on_remove(
+                self.hass.bus.async_listen(
+                    f"{EVENT_PREFIX}{event_type}",
+                    self._handle_playback_event,
+                )
             )
-        )
 
     def _matches(self, event: Event) -> bool:
         """Return whether a playback event belongs to this entity."""
         return event.data.get("server") == self._entry_id
 
     @callback
-    def _handle_final_credits_started(self, event: Event) -> None:
+    def _handle_playback_event(self, event: Event) -> None:
         """Publish matching playback events to Home Assistant."""
         if not self._matches(event):
             return
 
         self._trigger_event(
-            EVENT_TYPE_FINAL_CREDITS_STARTED,
+            event.event_type.removeprefix(EVENT_PREFIX),
             {key: value for key, value in event.data.items() if key != "server"},
         )
         self.async_write_ha_state()
@@ -189,8 +189,8 @@ class PlexPlayerPlaybackEvent(PlexPlaybackEvent):
         """Return whether a playback event came from this media player."""
         if not super()._matches(event):
             return False
-        player_entity_id = event.data.get("player_id")
-        if player_entity_id is None:
+        player_id = event.data.get("player_id")
+        if player_id is None:
             return False
-        player = entity_registry.async_get(self.hass).async_get(player_entity_id)
+        player = entity_registry.async_get(self.hass).async_get(player_id)
         return player is not None and player.id == self._player_id

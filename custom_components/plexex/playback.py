@@ -1,4 +1,4 @@
-"""Monitor Plex integration media-player updates for final credits."""
+"""Monitor Plex integration media-player updates for playback markers."""
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -14,12 +14,16 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .common import resolve_plex_connection
-from .const import EVENT_FINAL_CREDITS_STARTED, PLEX_DOMAIN
-from .plex_client import get_final_credits_marker
+from .const import EVENT_PREFIX, MARKER_ENDED, MARKER_STARTED, PLEX_DOMAIN
+from .models import Marker, MediaMarkers
+from .plex_client import get_markers
 
 _LOGGER = logging.getLogger(__name__)
 MARKER_CACHE_SIZE = 256
 POSITION_CHECK_INTERVAL = timedelta(seconds=1)
+# Checked position of a playback that just began: before any marker, so a
+# marker at the very beginning of the media is still entered.
+BEFORE_MEDIA_START = -1.0
 
 
 @dataclass
@@ -32,7 +36,7 @@ class Playback:
     updated_at: datetime
     user: str | None
     player_name: str | None
-    checked_position: float = 0.0
+    checked_position: float = BEFORE_MEDIA_START
 
     def position_at(self, now: datetime) -> float:
         """Estimate the position from the latest Plex position update."""
@@ -50,7 +54,7 @@ class PlexPlaybackMonitor:
         self._entry = entry
         self._plex_entry_id: str | None = None
         self._playbacks: dict[str, Playback] = {}
-        self._markers: OrderedDict[int, dict | None] = OrderedDict()
+        self._markers: OrderedDict[int, MediaMarkers | None] = OrderedDict()
 
     def start(self) -> None:
         """Listen for state updates pushed by Plex media players."""
@@ -86,7 +90,9 @@ class PlexPlaybackMonitor:
         ):
             if entity.domain == "media_player":
                 await self._async_update_player(
-                    entity.entity_id, self.hass.states.get(entity.entity_id)
+                    entity.entity_id,
+                    self.hass.states.get(entity.entity_id),
+                    seed=True,
                 )
 
     async def _async_state_changed(self, event: Event) -> None:
@@ -105,7 +111,7 @@ class PlexPlaybackMonitor:
         await self._async_update_player(entity_id, event.data["new_state"])
 
     async def _async_update_player(
-        self, entity_id: str, state: State | None
+        self, entity_id: str, state: State | None, *, seed: bool = False
     ) -> None:
         """Record the playback position of one Plex media player."""
         if state is None or state.state not in {"playing", "paused"}:
@@ -131,70 +137,94 @@ class PlexPlaybackMonitor:
         )
 
         previous = self._playbacks.get(entity_id)
-        if (
-            previous is not None
-            and previous.rating_key == rating_key
-            and (previous.playing or playback.playing)
-        ):
-            playback.checked_position = previous.checked_position
-        else:
+        if previous is not None and previous.rating_key == rating_key:
+            if previous.playing or playback.playing:
+                playback.checked_position = previous.checked_position
+            else:
+                # Scrubbing while paused only moves the baseline.
+                playback.checked_position = playback.position
+        elif seed:
+            # Already running when PlexEx started: report nothing it passed.
             playback.checked_position = playback.position_at(dt_util.utcnow())
         self._playbacks[entity_id] = playback
 
-        await self._async_load_marker(rating_key)
+        await self._async_load_markers(rating_key)
         self._async_check_positions(dt_util.utcnow())
 
-    async def _async_load_marker(self, rating_key: int) -> None:
-        """Fetch and cache a movie's final marker once per rating key."""
+    async def _async_load_markers(self, rating_key: int) -> None:
+        """Fetch and cache the markers of a media item once per rating key."""
         if rating_key in self._markers:
             self._markers.move_to_end(rating_key)
             return
 
         try:
             connection = resolve_plex_connection(self.hass, self._entry.entry_id)
-            marker = await self.hass.async_add_executor_job(
-                get_final_credits_marker,
+            markers = await self.hass.async_add_executor_job(
+                get_markers,
                 connection,
                 rating_key,
             )
         except Exception as err:
             _LOGGER.debug(
-                "Could not read final credits marker for %s (%s)",
+                "Could not read markers for %s (%s)",
                 rating_key,
                 type(err).__name__,
             )
             return
 
-        self._markers[rating_key] = marker
+        self._markers[rating_key] = markers
         if len(self._markers) > MARKER_CACHE_SIZE:
             self._markers.popitem(last=False)
 
     @callback
     def _async_check_positions(self, now: datetime) -> None:
-        """Fire when playback crosses the final marker start."""
         for entity_id, playback in tuple(self._playbacks.items()):
+            if playback.rating_key not in self._markers:
+                continue
             position = playback.position_at(now)
-            marker = self._markers.get(playback.rating_key)
-            if (
-                marker is not None
-                and playback.checked_position
-                < marker["marker_start"] / 1000
-                <= position
-            ):
-                self.hass.bus.async_fire(
-                    EVENT_FINAL_CREDITS_STARTED,
-                    {
-                        "server": self._entry.entry_id,
-                        "rating_key": playback.rating_key,
-                        "title": marker["title"],
-                        "view_offset": round(position * 1000),
-                        "marker_start": marker["marker_start"],
-                        "marker_end": marker["marker_end"],
-                        "user": playback.user,
-                        # Deprecated: use "player_name". Remove in 0.9.0.
-                        "player": playback.player_name,
-                        "player_name": playback.player_name,
-                        "player_id": entity_id,
-                    },
-                )
+            media = self._markers[playback.rating_key]
+            for marker in media.markers if media is not None else ():
+                start, end = marker.start / 1000, marker.end / 1000
+                if playback.checked_position < start <= position < end:
+                    self._async_fire(
+                        entity_id, playback, media, marker, MARKER_STARTED, position
+                    )
+                elif start <= playback.checked_position < end <= position:
+                    self._async_fire(
+                        entity_id, playback, media, marker, MARKER_ENDED, position
+                    )
             playback.checked_position = position
+
+    @callback
+    def _async_fire(
+        self,
+        entity_id: str,
+        playback: Playback,
+        media: MediaMarkers,
+        marker: Marker,
+        phase: str,
+        position: float,
+    ) -> None:
+        """Fire the event of a marker that playback entered or left."""
+        self.hass.bus.async_fire(
+            f"{EVENT_PREFIX}{marker.kind}_{phase}",
+            {
+                "server": self._entry.entry_id,
+                "rating_key": playback.rating_key,
+                "media_type": media.media_type,
+                "title": media.title,
+                "show_title": media.show_title,
+                "season": media.season,
+                "episode": media.episode,
+                "marker_type": marker.type,
+                "final": marker.final,
+                "view_offset": round(position * 1000),
+                "marker_start": marker.start,
+                "marker_end": marker.end,
+                "user": playback.user,
+                # Deprecated: use "player_name". Remove in 0.9.0.
+                "player": playback.player_name,
+                "player_name": playback.player_name,
+                "player_id": entity_id,
+            },
+        )

@@ -5,7 +5,7 @@ PlexEx extends an existing Plex Media Server connection with automation actions 
 - `plexex.search_movies` — search the movie library by title or title fragment.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
-- A **Playback event** event entity with the **final_credits_started** event type when playback enters a movie's final credits marker: one for the whole server and one for each Plex player. The integration also fires the `plexex_final_credits_started` Home Assistant event.
+- A **Playback event** event entity that reports when playback of a movie or an episode enters or leaves a Plex marker: intro, credits, final credits, or commercial. There is one entity for the whole server and one for each Plex player. Each event type is also fired as a Home Assistant event, for example `plexex_final_credits_started`.
 
 PlexEx reuses the URL and token stored by the official Home Assistant Plex integration. It does not ask for Plex credentials again.
 
@@ -145,9 +145,26 @@ The same optional `server` field is available for `plexex.mark_unwatched`. Leave
 
 Each PlexEx config entry creates a diagnostic binary sensor named **Plex Pass**. It is on when the Plex server reports an active Plex Pass; this is read from the server itself. Its attributes include the Plex username, subscription plan, and subscription features. These come from plex.tv using the server's token and are empty when the token cannot be used there, for example on a local server without a token. Everything is refreshed hourly.
 
-## Final credits trigger
+## Playback marker triggers
 
-PlexEx listens for state updates from media players created by the official Plex integration. When a movie starts playing, it fetches and caches that movie's final credits marker. Between position updates, it estimates playback locally from `media_position` and `media_position_updated_at` and checks the estimate once per second; it does not poll Plex sessions. When the estimated position crosses the marker start, it fires the `plexex_final_credits_started` Home Assistant event and updates the PlexEx **Playback event** entities.
+PlexEx listens for state updates from media players created by the official Plex integration. When a movie or an episode starts playing, it fetches and caches the item's markers. Between position updates, it estimates playback locally from `media_position` and `media_position_updated_at` and checks the estimate once per second; it does not poll Plex sessions. When the estimated position moves into or out of a marker, it fires a Home Assistant event and updates the PlexEx **Playback event** entity.
+
+Markers are created by Plex itself when it analyzes the library (intro and credits detection are Plex Pass features). PlexEx does not guess: an item without markers produces no events.
+
+### Event types
+
+| Event type | Fires when playback |
+|---|---|
+| `intro_started` | enters an intro |
+| `intro_ended` | plays past the end of an intro |
+| `credits_started` | enters credits that are not the final ones, for example before a post-credits scene |
+| `credits_ended` | plays past the end of those credits |
+| `final_credits_started` | enters the final credits (the marker Plex flags with `final="1"`) |
+| `final_credits_ended` | plays past the end of the final credits |
+| `commercial_started` | enters a commercial break of a recording |
+| `commercial_ended` | plays past the end of a commercial break |
+
+A credits marker is reported either as `credits_*` or as `final_credits_*`, never both. To react to any credits, list both event types in the trigger. Final credits usually run to the end of the item, so `final_credits_ended` is rare: stopping playback is not reported as an end.
 
 ### React to one player
 
@@ -179,9 +196,26 @@ triggers:
         - final_credits_started
 ```
 
+Every event type is also fired on the Home Assistant event bus with the `plexex_` prefix, for example `plexex_intro_started`.
+
 ### Event data
 
-The event data includes `server` (PlexEx config entry ID), `rating_key`, `title`, `view_offset`, `marker_start`, `marker_end`, `user`, `player_name` (display name), and `player_id` (entity ID of the Plex media player). `player` is deprecated: it carries the same value as `player_name` and will be removed in 0.9.0. To filter the raw `plexex_final_credits_started` event by player, match on `player_id`:
+| Field | Description |
+|---|---|
+| `server` | PlexEx config entry ID (bus event only) |
+| `rating_key` | Plex library item identifier |
+| `media_type` | `movie` or `episode` |
+| `title` | Movie or episode title |
+| `show_title`, `season`, `episode` | Show name, season number, and episode number; `null` for movies |
+| `marker_type` | Plex marker type: `intro`, `credits`, or `commercial` |
+| `final` | `true` for the final credits marker |
+| `marker_start`, `marker_end` | Marker boundaries in milliseconds |
+| `view_offset` | Estimated playback position in milliseconds when the event fired |
+| `user` | Plex username |
+| `player` | Player name |
+| `player_id` | Entity ID of the Plex media player |
+
+To filter a bus event by player, match on `player_id`:
 
 ```yaml
 triggers:
@@ -191,12 +225,17 @@ triggers:
       player_id: media_player.plex_plex_for_apple_tv_living_room
 ```
 
-Time offsets are milliseconds. The event is emitted only when Plex provides a final credits marker (`final="1"`); it is not inferred from every `credits` marker. If playback is already inside the marker when PlexEx starts, PlexEx establishes a baseline and does not fire an event for that playback.
+### How seeking and resuming are handled
+
+- Seeking forward into a marker counts as entering it. Seeking over a whole marker, or backward into one, fires nothing.
+- A playback that begins inside a marker fires its `*_started` event. This covers intros that start at the very beginning of an episode, and also an item resumed in the middle of its credits.
+- If playback is already inside a marker when PlexEx starts, PlexEx establishes a baseline and does not fire `*_started` for it.
+- Moving the position while paused only moves the baseline; resuming inside a marker after that fires nothing.
 
 ## Technical notes
 
 - PlexAPI network calls run in Home Assistant's executor, not in the event loop.
-- PlexEx supports movies only.
+- `plexex.search_movies` covers movies only. Marker events cover movies and TV episodes.
 - PlexEx creates one diagnostic binary sensor for each configured Plex server.
 - PlexAPI is supplied by the official Plex integration dependency; PlexEx does not install a second version.
 

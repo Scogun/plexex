@@ -6,7 +6,8 @@ from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
 from requests import RequestException, Session
 
-from .models import PlexCapabilities, PlexConnection
+from .const import MARKER_TYPES
+from .models import Marker, MediaMarkers, PlexCapabilities, PlexConnection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,30 +78,33 @@ def mark_unwatched(connection: PlexConnection, rating_key: int) -> None:
     plex = _connect(connection)
     plex.fetchItem(rating_key).markUnwatched()
 
-def get_final_credits_marker(
-    connection: PlexConnection, rating_key: int
-) -> dict[str, Any] | None:
-    """Fetch a movie's final credits marker and cacheable metadata."""
+def get_markers(connection: PlexConnection, rating_key: int) -> MediaMarkers | None:
+    """Fetch the markers of a movie or an episode with cacheable metadata."""
     plex = _connect(connection)
     item = plex.fetchItem(rating_key)
+    if item.type not in ("movie", "episode"):
+        return None
     item.reload(includeMarkers=True)
 
-    if item.type != "movie" and item.type != "episode":
-        return None
-
-    final_marker = next(
-        (
-            marker for marker in item.markers
-            if marker.type == "credits" and marker.final
-        ),
-        None,
+    is_episode = item.type == "episode"
+    markers = (
+        Marker(
+            type=marker.type,
+            final=bool(marker.final),
+            start=int(marker.start),
+            end=int(marker.end),
+        )
+        for marker in item.markers
+        if marker.type in MARKER_TYPES
+        and marker.start is not None
+        and marker.end is not None
     )
-    if final_marker is None:
-        return None
-
-    return {
-        "rating_key": int(item.ratingKey),
-        "title": item.title,
-        "marker_start": int(final_marker.start),
-        "marker_end": int(final_marker.end),
-    }
+    return MediaMarkers(
+        rating_key=int(item.ratingKey),
+        media_type=item.type,
+        title=item.title,
+        show_title=item.grandparentTitle if is_episode else None,
+        season=item.parentIndex if is_episode else None,
+        episode=item.index if is_episode else None,
+        markers=tuple(sorted(markers, key=lambda marker: marker.start)),
+    )

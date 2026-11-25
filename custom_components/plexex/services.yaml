@@ -36,3 +36,28 @@ mark_unwatched:
       selector:
         config_entry:
           integration: plexex
+
+skip_marker:
+  name: Skip marker
+  description: Seek a Plex player to the end of the intro, credits, or commercial break it is playing right now.
+  fields:
+    entity_id:
+      name: Player
+      description: Media player of the official Plex integration.
+      required: true
+      selector:
+        entity:
+          integration: plex
+          domain: media_player
+    markers:
+      name: Markers
+      description: Kinds of markers to skip. Leave empty to skip any marker.
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - intro
+            - credits
+            - final_credits
+            - commercial

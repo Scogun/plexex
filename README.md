@@ -4,6 +4,7 @@ PlexEx extends an existing Plex Media Server connection with automation actions 
 
 - `plexex.search_movies` — search the movie library by title or title fragment.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
+- `plexex.skip_marker` — seek a Plex player past the intro, credits, or commercial break it is playing.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
 - A **Playback event** event entity that reports when playback of a movie or an episode enters or leaves a Plex marker: intro, credits, final credits, or commercial. There is one entity for the whole server and one for each Plex player. Each event type is also fired as a Home Assistant event, for example `plexex_final_credits_started`.
 
@@ -125,6 +126,42 @@ sequence:
         - action: plexex.mark_unwatched
           data:
             rating_key: "{{ repeat.item.ratingKey }}"
+```
+
+### `plexex.skip_marker`
+
+Seeks a Plex player to the end of the marker it is playing right now: an intro, credits, or a commercial break.
+
+```yaml
+action: plexex.skip_marker
+data:
+  entity_id: media_player.plex_plex_for_apple_tv_living_room
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `entity_id` | Yes | Media player created by the official Plex integration |
+| `markers` | No | Kinds of markers to skip: `intro`, `credits`, `final_credits`, `commercial`. Any marker is skipped when empty |
+
+The action fails if the player is not inside a marker (or not inside one of the selected kinds), so it is safe to call from a button. The seek itself is done by the official Plex integration through `media_player.media_seek`, so the player has to support seeking; Plex Web and other clients that cannot be controlled remotely do not. Skipping the final credits seeks to their end, which is usually the end of the item.
+
+This action has no `server` field: PlexEx finds the server from the media player.
+
+### Example: Skip intros automatically
+
+This automation skips every intro on every player. The trigger is the PlexEx bus event, which carries the player's entity ID:
+
+```yaml
+alias: Skip Plex intros
+triggers:
+  - trigger: event
+    event_type: plexex_intro_started
+actions:
+  - action: plexex.skip_marker
+    data:
+      entity_id: "{{ trigger.event.data.player_id }}"
+      markers:
+        - intro
 ```
 
 ## Multiple Plex servers

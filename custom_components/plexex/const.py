@@ -5,6 +5,7 @@ CONF_PLEX_ENTRY_ID = "plex_entry_id"
 CONF_SERVER = "server"
 SERVICE_SEARCH_MOVIES = "search_movies"
 SERVICE_MARK_UNWATCHED = "mark_unwatched"
+SERVICE_SKIP_MARKER = "skip_marker"
 
 # Marker types reported by Plex. A credits marker Plex flags as final is
 # reported as its own kind, so the last credits can be told from earlier ones.

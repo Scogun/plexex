@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
@@ -175,6 +176,28 @@ class PlexPlaybackMonitor:
         self._markers[rating_key] = markers
         if len(self._markers) > MARKER_CACHE_SIZE:
             self._markers.popitem(last=False)
+
+    @callback
+    def async_get_current_marker(
+        self, entity_id: str, kinds: Collection[str] = ()
+    ) -> Marker | None:
+        """Return the marker a Plex media player is inside right now.
+
+        Only markers of the given kinds are considered; none means any kind.
+        """
+        playback = self._playbacks.get(entity_id)
+        if playback is None:
+            return None
+        media = self._markers.get(playback.rating_key)
+        if media is None:
+            return None
+        position = playback.position_at(dt_util.utcnow()) * 1000
+        for marker in media.markers:
+            if marker.start <= position < marker.end and (
+                not kinds or marker.kind in kinds
+            ):
+                return marker
+        return None
 
     @callback
     def _async_check_positions(self, now: datetime) -> None:

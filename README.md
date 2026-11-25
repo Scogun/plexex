@@ -249,8 +249,9 @@ Every event type is also fired on the Home Assistant event bus with the `plexex_
 | `marker_start`, `marker_end` | Marker boundaries in milliseconds |
 | `view_offset` | Estimated playback position in milliseconds when the event fired |
 | `user` | Plex username |
-| `player` | Player name |
+| `player_name` | Player name |
 | `player_id` | Entity ID of the Plex media player |
+| `player` | Deprecated: same value as `player_name`; will be removed in 0.9.0 |
 
 To filter a bus event by player, match on `player_id`:
 

@@ -43,7 +43,9 @@ async def async_setup_entry(
         entry,
         PLATFORMS,
     )
-    PlexPlaybackMonitor(hass, entry).start()
+    # Kept on the entry so that actions can ask what a player is playing.
+    entry.runtime_data = PlexPlaybackMonitor(hass, entry)
+    entry.runtime_data.start()
 
     return True
 

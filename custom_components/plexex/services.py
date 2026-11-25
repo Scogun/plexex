@@ -7,8 +7,8 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from .common import resolve_plex_connection
 from .const import (
-    CONF_SERVER, DOMAIN,
-    SERVICE_MARK_UNWATCHED, SERVICE_SEARCH_MOVIES,
+    CONF_SERVER, DOMAIN, MARKER_KINDS,
+    SERVICE_MARK_UNWATCHED, SERVICE_SEARCH_MOVIES, SERVICE_SKIP_MARKER,
 )
 from .plex_client import mark_unwatched, search_movies
 
@@ -21,6 +21,12 @@ SEARCH_MOVIES_SCHEMA = vol.Schema({
 MARK_UNWATCHED_SCHEMA = vol.Schema({
     vol.Required("rating_key"): cv.positive_int,
     vol.Optional(CONF_SERVER): cv.string,
+})
+SKIP_MARKER_SCHEMA = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
+    vol.Optional("markers", default=[]): vol.All(
+        cv.ensure_list, [vol.In(MARKER_KINDS)]
+    ),
 })
 
 def async_register_services(hass: HomeAssistant) -> None:
@@ -51,6 +57,36 @@ def async_register_services(hass: HomeAssistant) -> None:
                 f"Could not mark Plex item as unwatched ({type(err).__name__})."
             ) from err
 
+    async def handle_skip_marker(call: ServiceCall) -> None:
+        entity_id = call.data["entity_id"]
+        kinds = call.data["markers"]
+        # A media player belongs to one server, so at most one monitor knows it.
+        marker = next(
+            (
+                marker
+                for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+                if (
+                    marker := entry.runtime_data.async_get_current_marker(
+                        entity_id, kinds
+                    )
+                )
+            ),
+            None,
+        )
+        if marker is None:
+            raise ServiceValidationError(
+                f"{entity_id} is not playing inside "
+                f"{'one of the selected markers' if kinds else 'a marker'}."
+            )
+        # The official Plex integration owns the player, so let it seek.
+        await hass.services.async_call(
+            "media_player",
+            "media_seek",
+            {"entity_id": entity_id, "seek_position": marker.end / 1000},
+            blocking=True,
+            context=call.context,
+        )
+
     hass.services.async_register(
         DOMAIN, SERVICE_SEARCH_MOVIES, handle_search_movies,
         schema=SEARCH_MOVIES_SCHEMA, supports_response=SupportsResponse.ONLY,
@@ -58,4 +94,8 @@ def async_register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_MARK_UNWATCHED, handle_mark_unwatched,
         schema=MARK_UNWATCHED_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SKIP_MARKER, handle_skip_marker,
+        schema=SKIP_MARKER_SCHEMA,
     )

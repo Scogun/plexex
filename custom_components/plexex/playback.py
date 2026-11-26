@@ -2,20 +2,22 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_STATE_CHANGED
-from homeassistant.core import Event, HomeAssistant, State, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
 from homeassistant.helpers import entity_registry
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
+from homeassistant.util.hass_dict import HassKey
 
 from .common import resolve_plex_connection
-from .const import EVENT_PREFIX, MARKER_ENDED, MARKER_STARTED, PLEX_DOMAIN
+from .const import DOMAIN, EVENT_PREFIX, MARKER_ENDED, MARKER_STARTED, PLEX_DOMAIN
 from .models import Marker, MediaMarkers
 from .plex_client import get_markers
 
@@ -25,6 +27,58 @@ POSITION_CHECK_INTERVAL = timedelta(seconds=1)
 # Checked position of a playback that just began: before any marker, so a
 # marker at the very beginning of the media is still entered.
 BEFORE_MEDIA_START = -1.0
+
+
+@dataclass(eq=False)
+class MarkerListener:
+    """A subscriber to one kind of marker event, shifted by its own offset.
+
+    The offset is in seconds: negative is before the marker boundary, positive
+    after it. The listener is notified with the data of the event.
+    """
+
+    kind: str
+    phase: str
+    offset: float
+    notify: Callable[[dict[str, Any]], None]
+
+
+# Listeners live outside the monitors: automations attach before a server is
+# set up and stay attached while its config entry reloads.
+DATA_MARKER_LISTENERS: HassKey[list[MarkerListener]] = HassKey(
+    f"{DOMAIN}_marker_listeners"
+)
+
+
+@callback
+def async_listen_marker(hass: HomeAssistant, listener: MarkerListener) -> CALLBACK_TYPE:
+    """Notify a listener of marker events on every server, until removed."""
+    listeners = hass.data.setdefault(DATA_MARKER_LISTENERS, [])
+    listeners.append(listener)
+
+    @callback
+    def remove() -> None:
+        listeners.remove(listener)
+
+    return remove
+
+
+def _crossed(
+    marker: Marker, phase: str, offset: float, checked: float, position: float
+) -> bool:
+    """Return whether playback moved over the start or the end of a marker.
+
+    The offset moves that boundary. A seek over the whole marker, or backward
+    into it, is not a crossing.
+    """
+    start, end = marker.start / 1000, marker.end / 1000
+    if phase == MARKER_STARTED:
+        # A new playback is checked from just before the media start, so an
+        # early start has to stay inside the media to be noticed at all.
+        start = max(start + offset, 0.0)
+        return checked < start <= position < end
+    end += offset
+    return start <= checked < end <= position
 
 
 @dataclass
@@ -201,53 +255,52 @@ class PlexPlaybackMonitor:
 
     @callback
     def _async_check_positions(self, now: datetime) -> None:
+        listeners = self.hass.data.get(DATA_MARKER_LISTENERS, ())
         for entity_id, playback in tuple(self._playbacks.items()):
             if playback.rating_key not in self._markers:
                 continue
+            checked = playback.checked_position
             position = playback.position_at(now)
             media = self._markers[playback.rating_key]
             for marker in media.markers if media is not None else ():
-                start, end = marker.start / 1000, marker.end / 1000
-                if playback.checked_position < start <= position < end:
-                    self._async_fire(
-                        entity_id, playback, media, marker, MARKER_STARTED, position
-                    )
-                elif start <= playback.checked_position < end <= position:
-                    self._async_fire(
-                        entity_id, playback, media, marker, MARKER_ENDED, position
-                    )
+                event = (entity_id, playback, media, marker, position)
+                for phase in (MARKER_STARTED, MARKER_ENDED):
+                    if _crossed(marker, phase, 0, checked, position):
+                        self.hass.bus.async_fire(
+                            f"{EVENT_PREFIX}{marker.kind}_{phase}",
+                            self._event_data(*event),
+                        )
+                # Automation triggers: the same crossing, moved by their offset.
+                for listener in tuple(listeners):
+                    if listener.kind == marker.kind and _crossed(
+                        marker, listener.phase, listener.offset, checked, position
+                    ):
+                        listener.notify(self._event_data(*event))
             playback.checked_position = position
 
-    @callback
-    def _async_fire(
+    def _event_data(
         self,
         entity_id: str,
         playback: Playback,
         media: MediaMarkers,
         marker: Marker,
-        phase: str,
         position: float,
-    ) -> None:
-        """Fire the event of a marker that playback entered or left."""
-        self.hass.bus.async_fire(
-            f"{EVENT_PREFIX}{marker.kind}_{phase}",
-            {
-                "server": self._entry.entry_id,
-                "rating_key": playback.rating_key,
-                "media_type": media.media_type,
-                "title": media.title,
-                "show_title": media.show_title,
-                "season": media.season,
-                "episode": media.episode,
-                "marker_type": marker.type,
-                "final": marker.final,
-                "view_offset": round(position * 1000),
-                "marker_start": marker.start,
-                "marker_end": marker.end,
-                "user": playback.user,
-                # Deprecated: use "player_name". Remove in 0.9.0.
-                "player": playback.player_name,
-                "player_name": playback.player_name,
-                "player_id": entity_id,
-            },
-        )
+    ) -> dict[str, Any]:
+        """Describe a marker of the media a player is playing."""
+        return {
+            "server": self._entry.entry_id,
+            "rating_key": playback.rating_key,
+            "media_type": media.media_type,
+            "title": media.title,
+            "show_title": media.show_title,
+            "season": media.season,
+            "episode": media.episode,
+            "marker_type": marker.type,
+            "final": marker.final,
+            "view_offset": round(position * 1000),
+            "marker_start": marker.start,
+            "marker_end": marker.end,
+            "user": playback.user,
+            "player_name": playback.player_name,
+            "player_id": entity_id,
+        }

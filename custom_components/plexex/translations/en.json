@@ -13,5 +13,87 @@
       "no_plex_servers": "No configured official Plex servers were found.",
       "already_configured": "This Plex server is already configured in PlexEx."
     }
+  },
+  "triggers": {
+    "intro_started": {
+      "name": "Plex intro started",
+      "description": "Triggers when a Plex player enters an intro.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the start of the marker."
+        }
+      }
+    },
+    "intro_ended": {
+      "name": "Plex intro ended",
+      "description": "Triggers when a Plex player plays past the end of an intro.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the end of the marker."
+        }
+      }
+    },
+    "credits_started": {
+      "name": "Plex credits started",
+      "description": "Triggers when a Plex player enters credits that are not the final ones.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the start of the marker."
+        }
+      }
+    },
+    "credits_ended": {
+      "name": "Plex credits ended",
+      "description": "Triggers when a Plex player plays past the end of credits that are not the final ones.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the end of the marker."
+        }
+      }
+    },
+    "commercial_started": {
+      "name": "Plex commercial break started",
+      "description": "Triggers when a Plex player enters a commercial break.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the start of the marker."
+        }
+      }
+    },
+    "commercial_ended": {
+      "name": "Plex commercial break ended",
+      "description": "Triggers when a Plex player plays past the end of a commercial break.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the end of the marker."
+        }
+      }
+    },
+    "final_credits_started": {
+      "name": "Plex final credits started",
+      "description": "Triggers when a Plex player enters the final credits.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the start of the marker."
+        }
+      }
+    },
+    "final_credits_ended": {
+      "name": "Plex final credits ended",
+      "description": "Triggers when a Plex player plays past the end of the final credits.",
+      "fields": {
+        "offset": {
+          "name": "Offset",
+          "description": "Time to trigger before or after the end of the marker."
+        }
+      }
+    }
   }
 }

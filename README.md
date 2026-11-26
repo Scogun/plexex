@@ -7,6 +7,7 @@ PlexEx extends an existing Plex Media Server connection with automation actions 
 - `plexex.skip_marker` — seek a Plex player past the intro, credits, or commercial break it is playing.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
 - A **Playback event** event entity that reports when playback of a movie or an episode enters or leaves a Plex marker: intro, credits, final credits, or commercial. There is one entity for the whole server and one for each Plex player. Each event type is also fired as a Home Assistant event, for example `plexex_final_credits_started`.
+- Automation triggers for the same events, such as `plexex.final_credits_started`, each with its own target players and a before/after offset.
 
 PlexEx reuses the URL and token stored by the official Home Assistant Plex integration. It does not ask for Plex credentials again.
 
@@ -262,6 +263,32 @@ triggers:
     event_data:
       player_id: media_player.plex_plex_for_apple_tv_living_room
 ```
+
+### Triggers with an offset
+
+PlexEx also provides its own automation triggers, one per event type, named like the event: `plexex.intro_started`, `plexex.final_credits_started`, and so on. Unlike the **Playback event** entities, each trigger has its own offset, so it can fire before or after the marker boundary, for example to bring the lights up 20 seconds before the final credits begin.
+
+In the automation editor, add a trigger, search for **Plex**, pick the event, select the Plex players to follow, and set **Offset** to **Before** or **After** with a duration. In YAML a negative offset is before the boundary and a positive one after it:
+
+```yaml
+triggers:
+  - trigger: plexex.final_credits_started
+    target:
+      entity_id: media_player.plex_plex_for_apple_tv_living_room
+    options:
+      offset: "-00:00:20"
+```
+
+- **Target:** media players of the official Plex integration, chosen directly or through a device, area, or label. In YAML the target can be left out to follow every Plex player.
+- **Offset:** applies to this trigger only. Other triggers, the **Playback event** entities, and the `plexex_*` bus events are not shifted.
+- **Trigger data:** the fields of the [event data](#event-data) are available on `trigger`, for example `{{ trigger.title }}`, together with `trigger.entity_id` (the media player), `trigger.event` (the event type), and `trigger.offset`. `marker_start` and `marker_end` always carry the boundaries Plex reports; `view_offset` shows where playback was when the trigger fired.
+
+Two limits follow from how markers are tracked:
+
+- A trigger cannot fire before the item begins, so a **Before** offset on a marker at the very beginning fires at the start of playback.
+- A trigger whose offset moves the start of a marker to or past its end, or the end to or before its start, never fires for that marker. For example, `plexex.intro_started` with an offset of one minute after never fires for a 30-second intro.
+
+`plexex.skip_marker` only works while the player is inside the marker, so it cannot be called from a `*_started` trigger with a **Before** offset.
 
 ### How seeking and resuming are handled
 

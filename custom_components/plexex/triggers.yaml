@@ -1,0 +1,23 @@
+.trigger_common: &trigger_common
+  target:
+    device:
+      integration: plex
+  fields:
+    offset:
+      required: true
+      default:
+        hours: 0
+        minutes: 0
+        seconds: 0
+      selector:
+        duration:
+          mode: offset
+
+intro_started: *trigger_common
+intro_ended: *trigger_common
+credits_started: *trigger_common
+credits_ended: *trigger_common
+commercial_started: *trigger_common
+commercial_ended: *trigger_common
+final_credits_started: *trigger_common
+final_credits_ended: *trigger_common

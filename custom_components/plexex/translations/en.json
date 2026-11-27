@@ -21,7 +21,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the start of the marker."
+          "description": "Time to trigger before or after the start of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -31,7 +31,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the end of the marker."
+          "description": "Time to trigger before or after the end of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -41,7 +41,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the start of the marker."
+          "description": "Time to trigger before or after the start of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -51,7 +51,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the end of the marker."
+          "description": "Time to trigger before or after the end of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -61,7 +61,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the start of the marker."
+          "description": "Time to trigger before or after the start of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -71,7 +71,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the end of the marker."
+          "description": "Time to trigger before or after the end of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -81,7 +81,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the start of the marker."
+          "description": "Time to trigger before or after the start of the marker (maximum 5 minutes)."
         }
       }
     },
@@ -91,7 +91,7 @@
       "fields": {
         "offset": {
           "name": "Offset",
-          "description": "Time to trigger before or after the end of the marker."
+          "description": "Time to trigger before or after the end of the marker (maximum 5 minutes)."
         }
       }
     }

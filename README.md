@@ -280,7 +280,7 @@ triggers:
 ```
 
 - **Target:** media players of the official Plex integration, chosen directly or through a device, area, or label. In YAML the target can be left out to follow every Plex player.
-- **Offset:** applies to this trigger only. Other triggers, the **Playback event** entities, and the `plexex_*` bus events are not shifted.
+- **Offset:** applies to this trigger only and is limited to five minutes before or after the marker. Other triggers, the **Playback event** entities, and the `plexex_*` bus events are not shifted.
 - **Trigger data:** the fields of the [event data](#event-data) are available on `trigger`, for example `{{ trigger.title }}`, together with `trigger.entity_id` (the media player), `trigger.event` (the event type), and `trigger.offset`. `marker_start` and `marker_end` always carry the boundaries Plex reports; `view_offset` shows where playback was when the trigger fired.
 
 Two limits follow from how markers are tracked:

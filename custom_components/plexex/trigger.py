@@ -23,11 +23,22 @@ from homeassistant.helpers.typing import ConfigType
 from .const import MARKER_ENDED, MARKER_KINDS, MARKER_STARTED
 from .playback import MarkerListener, async_listen_marker
 
+_MAX_OFFSET = timedelta(minutes=5)
+
+
+def _validate_offset(value: Any) -> timedelta:
+    """Validate that the marker offset is within five minutes."""
+    offset = cv.time_period(value)
+    if abs(offset) > _MAX_OFFSET:
+        raise vol.Invalid("Offset must be between -5 minutes and 5 minutes")
+    return offset
+
+
 _TRIGGER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_OPTIONS, default={}): {
             # Negative is before the marker boundary, positive after it.
-            vol.Required(CONF_OFFSET, default=timedelta(0)): cv.time_period,
+            vol.Required(CONF_OFFSET, default=timedelta(0)): _validate_offset,
         },
         # Without a target the trigger follows every Plex player.
         vol.Optional(CONF_TARGET): cv.TARGET_FIELDS,

@@ -1,0 +1,28 @@
+{
+  "triggers": {
+    "intro_started": {
+      "trigger": "mdi:play-box-outline"
+    },
+    "intro_ended": {
+      "trigger": "mdi:skip-next-outline"
+    },
+    "credits_started": {
+      "trigger": "mdi:movie-roll"
+    },
+    "credits_ended": {
+      "trigger": "mdi:movie-check-outline"
+    },
+    "commercial_started": {
+      "trigger": "mdi:advertisements"
+    },
+    "commercial_ended": {
+      "trigger": "mdi:advertisements-off"
+    },
+    "final_credits_started": {
+      "trigger": "mdi:filmstrip"
+    },
+    "final_credits_ended": {
+      "trigger": "mdi:filmstrip-off"
+    }
+  }
+}

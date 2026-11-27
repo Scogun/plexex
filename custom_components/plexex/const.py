@@ -3,9 +3,13 @@ DOMAIN = "plexex"
 PLEX_DOMAIN = "plex"
 CONF_PLEX_ENTRY_ID = "plex_entry_id"
 CONF_SERVER = "server"
+SERVICE_SEARCH = "search"
 SERVICE_SEARCH_MOVIES = "search_movies"
 SERVICE_MARK_UNWATCHED = "mark_unwatched"
 SERVICE_SKIP_MARKER = "skip_marker"
+
+# Library item types plexex.search can look for.
+SEARCH_TYPES = ("movie", "show", "season", "episode")
 
 # Marker types reported by Plex. A credits marker Plex flags as final is
 # reported as its own kind, so the last credits can be told from earlier ones.

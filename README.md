@@ -2,7 +2,8 @@
 
 PlexEx extends an existing Plex Media Server connection with automation actions and a Plex Pass status sensor:
 
-- `plexex.search_movies` — search the movie library by title or title fragment.
+- `plexex.search` — search the library for movies, shows, seasons, or episodes by title or title fragment.
+- `plexex.search_movies` — deprecated; use `plexex.search` with `type: movie`.
 - `plexex.mark_unwatched` — mark a movie as unwatched using its Plex `ratingKey`.
 - `plexex.skip_marker` — seek a Plex player past the intro, credits, or commercial break it is playing.
 - A diagnostic binary sensor that reports whether the Plex account has an active Plex Pass subscription.
@@ -48,7 +49,54 @@ Add one PlexEx config entry for each Plex server you want to use.
 
 ## Actions
 
+### `plexex.search`
+
+Searches the Plex library for items of one type by full or partial title.
+
+```yaml
+action: plexex.search
+data:
+  type: episode
+  title: Pilot
+response_variable: result
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | Yes | `movie`, `show`, `season`, or `episode` |
+| `title` | Yes | Full or partial title of the item itself. For a season or an episode this is its own title, not the title of the show |
+| `server` | No | PlexEx connection, see [Multiple Plex servers](#multiple-plex-servers) |
+
+The action returns structured response data and can be used with `response_variable`:
+
+```yaml
+items:
+  - type: episode
+    ratingKey: 23456
+    title: Pilot
+    year: 2008
+    viewCount: 1
+    lastViewedAt: "2025-12-25T20:15:00"
+    showTitle: Breaking Bad
+    seasonNumber: 1
+    episodeNumber: 1
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | String | `movie`, `show`, `season`, or `episode` |
+| `ratingKey` | Integer | Plex library item identifier |
+| `title` | String | Title of the item |
+| `year` | Integer or null | Release year |
+| `viewCount` | Integer | Number of times watched |
+| `lastViewedAt` | String or null | Last viewed timestamp |
+| `showTitle` | String | Title of the show; seasons and episodes only |
+| `seasonNumber` | Integer | Season number; seasons and episodes only |
+| `episodeNumber` | Integer | Episode number; episodes only |
+
 ### `plexex.search_movies`
+
+> **Deprecated:** `plexex.search_movies` will be removed in PlexEx 0.10.0. Use [`plexex.search`](#plexexsearch) with `type: movie` instead; it returns the same movies under `items` instead of `movies`.
 
 Searches the Plex movie library by full or partial title.
 
@@ -74,7 +122,8 @@ Response structure:
 
 ```yaml
 movies:
-  - ratingKey: 12345
+  - type: movie
+    ratingKey: 12345
     title: Harry Potter and the Philosopher's Stone
     year: 2001
     viewCount: 1
@@ -83,6 +132,7 @@ movies:
 
 | Field | Type | Description |
 |---|---|---|
+| `type` | String | Always `movie` |
 | `ratingKey` | Integer | Plex library item identifier |
 | `title` | String | Movie title |
 | `year` | Integer | Release year |
@@ -101,7 +151,7 @@ data:
   rating_key: 12345
 ```
 
-Use the integer `ratingKey` returned by `plexex.search_movies`.
+Use the integer `ratingKey` returned by `plexex.search`.
 
 ### Example: Search and mark all matching movies as unwatched
 
@@ -115,13 +165,14 @@ fields:
       text:
 
 sequence:
-  - action: plexex.search_movies
+  - action: plexex.search
     data:
+      type: movie
       title: "{{ title }}"
     response_variable: result
 
   - repeat:
-      for_each: "{{ result.movies }}"
+      for_each: "{{ result.items }}"
       sequence:
         - action: plexex.mark_unwatched
           data:
@@ -169,14 +220,15 @@ actions:
 If multiple PlexEx entries are configured, select the connection in the action's **Server** field. In YAML, `server` is the PlexEx config entry ID selected by the action selector:
 
 ```yaml
-action: plexex.search_movies
+action: plexex.search
 data:
+  type: movie
   title: Interstellar
   server: YOUR_PLEXEX_CONFIG_ENTRY_ID
 response_variable: result
 ```
 
-The same optional `server` field is available for `plexex.mark_unwatched`. Leave it empty if only one PlexEx connection is configured.
+The same optional `server` field is available for `plexex.search` and `plexex.mark_unwatched`. Leave it empty if only one PlexEx connection is configured.
 
 ## Plex Pass sensor
 
@@ -273,7 +325,7 @@ triggers:
 ## Technical notes
 
 - PlexAPI network calls run in Home Assistant's executor, not in the event loop.
-- `plexex.search_movies` covers movies only. Marker events cover movies and TV episodes.
+- `plexex.search` covers movies, shows, seasons, and episodes. Marker events cover movies and TV episodes.
 - PlexEx creates one diagnostic binary sensor for each configured Plex server.
 - PlexAPI is supplied by the official Plex integration dependency; PlexEx does not install a second version.
 

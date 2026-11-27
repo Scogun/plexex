@@ -1,6 +1,35 @@
+search:
+  name: Search
+  description: Search the Plex library for movies, shows, seasons, or episodes by a title or title fragment.
+  fields:
+    type:
+      name: Type
+      description: Kind of library item to search for.
+      required: true
+      selector:
+        select:
+          options:
+            - movie
+            - show
+            - season
+            - episode
+    title:
+      name: Title
+      description: Full or partial title of the item itself. For a season or an episode this is its own title, not the title of the show.
+      required: true
+      selector:
+        text:
+    server:
+      name: Server
+      description: Select a PlexEx connection. Leave empty when only one is configured.
+      required: false
+      selector:
+        config_entry:
+          integration: plexex
+
 search_movies:
-  name: Search movies
-  description: Search the selected Plex movie library by a title or title fragment.
+  name: Search movies (deprecated)
+  description: Deprecated, will be removed in PlexEx 0.10.0. Use the Search action with the type set to movie instead.
   fields:
     title:
       name: Title

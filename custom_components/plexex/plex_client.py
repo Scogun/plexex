@@ -55,23 +55,31 @@ def get_capabilities(connection: PlexConnection) -> PlexCapabilities:
         subscription_features=tuple(str(item) for item in features),
     )
 
-def search_movies(connection: PlexConnection, title: str) -> dict[str, Any]:
-    """Search the Plex movie library."""
+def search(connection: PlexConnection, media_type: str, title: str) -> dict[str, Any]:
+    """Search the Plex library for items of one type by their title."""
     plex = _connect(connection)
-    found_movies = plex.library.search(title=title, libtype="movie")
-    movies = []
-    for movie in found_movies:
-        last_viewed_at = movie.lastViewedAt
-        movies.append({
-            "ratingKey": int(movie.ratingKey),
-            "title": movie.title,
-            "year": movie.year,
-            "viewCount": movie.viewCount or 0,
+    items = []
+    for item in plex.library.search(title=title, libtype=media_type):
+        last_viewed_at = item.lastViewedAt
+        found = {
+            "type": item.type,
+            "ratingKey": int(item.ratingKey),
+            "title": item.title,
+            "year": item.year,
+            "viewCount": item.viewCount or 0,
             "lastViewedAt": (
                 last_viewed_at.isoformat() if last_viewed_at is not None else None
             ),
-        })
-    return {"movies": movies}
+        }
+        if item.type == "season":
+            found["showTitle"] = item.parentTitle
+            found["seasonNumber"] = item.index
+        elif item.type == "episode":
+            found["showTitle"] = item.grandparentTitle
+            found["seasonNumber"] = item.parentIndex
+            found["episodeNumber"] = item.index
+        items.append(found)
+    return {"items": items}
 
 def mark_unwatched(connection: PlexConnection, rating_key: int) -> None:
     """Mark a Plex library item as unwatched."""
